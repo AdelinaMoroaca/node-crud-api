@@ -1,7 +1,6 @@
 import fastify from 'fastify';
 import * as dotenv from 'dotenv';
-import { productRoutes } from './routes/products.js'; // extensia .js este OBLIGATORIE cu NodeNext/ESM
-
+import { productRoutes } from './routes/products'; 
 dotenv.config();
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
