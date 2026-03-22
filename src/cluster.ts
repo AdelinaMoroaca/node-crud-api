@@ -1,23 +1,40 @@
 import cluster from 'cluster';
 import { cpus } from 'os';
 import http from 'http';
-import { createProxyServer } from 'http-proxy';
 
 const numCPUs = cpus().length;
 const PORT = Number(process.env.PORT) || 4000;
 
 if (cluster.isPrimary) {
-  for (let i = 1; i < numCPUs; i++) {
+   for (let i = 1; i < numCPUs; i++) {
     cluster.fork({ PORT: PORT + i });
   }
 
   let current = 1;
-  const proxy = createProxyServer();
 
-  const server = http.createServer((req, res) => {
+   const server = http.createServer((req, res) => {
     const targetPort = PORT + current;
-    proxy.web(req, res, { target: `http://localhost:${targetPort}` });
-    current = current + 1 < numCPUs ? current + 1 : 1;
+    const options = {
+      hostname: 'localhost',
+      port: targetPort,
+      path: req.url,
+      method: req.method,
+      headers: req.headers,
+    };
+
+     const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+
+    proxyReq.on('error', (err) => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Proxy error', error: err.message }));
+    });
+
+    req.pipe(proxyReq, { end: true });
+
+     current = current + 1 < numCPUs ? current + 1 : 1;
   });
 
   server.listen(PORT, () => {
